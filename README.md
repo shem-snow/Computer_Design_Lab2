@@ -7,5 +7,6 @@ Some design decisions I made along the way:
   1. Branching/Jumping:
       a. I can use relative or absolute addressing.
       b. I can use the ALU to compute destination addresses or add hardware into the datapath for calculating it.
-          Keeping super-scaler processing in mind, I'm picking relative addressing with dedicated hardware in the datapath.
-  2. 
+          With super-scaler processing in mind, I'm picking relative addressing with dedicated hardware in the datapath for computing new addresses.
+  2. ALU complexity:
+      By placing a "decoder" unit in the datapath outside the ALU, I can make the ALU more simple.
