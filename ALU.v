@@ -64,10 +64,10 @@ module ALU #(parameter WIDTH = 16) (
 		result = {WIDTH{1'b0}}; // Concatonate WIDTH number of zeros
 		
 		carry_or_borrow_flag = 1'b0;
-      unsigned_less_than_flag = 1'b0;
-      signed_less_than_flag = 1'b0;
-      signed_overflow_flag = 1'b0;
-      equality_flag = 1'b0;
+		unsigned_less_than_flag = 1'b0;
+		signed_less_than_flag = 1'b0;
+		signed_overflow_flag = 1'b0;
+		equality_flag = 1'b0;
 		
 		case(alu_op)
 		
@@ -109,7 +109,8 @@ module ALU #(parameter WIDTH = 16) (
 				result = lhs ^ rhs;
 		
 			MULT:
-				result = lhs[7:0] * rhs[7:0];
+				// Performs multiplication of the whole 16-bit value then truncates the result
+				result = lhs * rhs;
 		
 			LUI:
 				result[15:8] = rhs[7:0];
@@ -140,7 +141,7 @@ module ALU #(parameter WIDTH = 16) (
 			
 			default:
 				result = {WIDTH{1'b0}};
-		end
+		endcase
 	end
 
 endmodule
