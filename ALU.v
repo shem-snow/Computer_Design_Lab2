@@ -14,7 +14,7 @@
 	-----------------------------------------------------------------------------------
 	XOR											Covers:	XOR, XORI
 	-----------------------------------------------------------------------------------
-	PASS 											Covers:	MOV, MOVI
+	MOV 											Covers:	MOV, MOVI
 	-----------------------------------------------------------------------------------
 	MULT											Covers:	MUL, MULI
 	-----------------------------------------------------------------------------------
@@ -29,6 +29,13 @@
 	ZEXT											Covers:	ZRXB
 	-----------------------------------------------------------------------------------
 	NOT											Covers:	NOT
+	-----------------------------------------------------------------------------------
+	---											Covers:	
+	-----------------------------------------------------------------------------------
+	---											Covers:	
+	-----------------------------------------------------------------------------------
+	NOOP											Covers: NOOP/WAIT
+	-----------------------------------------------------------------------------------
 */
 module ALU #(parameter WIDTH = 16) (
 	input [3:0] alu_op,
@@ -39,24 +46,30 @@ module ALU #(parameter WIDTH = 16) (
 );
 	localparam ZEXT 	= 4'b0000;
 	localparam SEXT 	= 4'b0001;
-	localparam ADD 	= 4'b0010;
-	localparam SUB		= 4'b0011;
-	localparam AND		= 4'b0100;
-	localparam OR		= 4'b0101;
-	localparam XOR		= 4'b0110;
+	localparam ADD 	= 4'b0010; // ADD, ADDI, ADDU, ADDUI, ADDC, ADDCU, ADDCUI, ADDCI
+	localparam SUB		= 4'b0011; // SUB, SUBI, CMP, CMPI, CMPU, CMPUI
+	localparam AND		= 4'b0100; // AND
+	localparam OR		= 4'b0101; // OR
+	localparam XOR		= 4'b0110; // XOR
 	localparam MULT 	= 4'b0111;
 	localparam LUI		= 4'b1000;
-	localparam LSH		= 4'b1001;
-	localparam ASH		= 4'b1010;
-	localparam PASS 	= 4'b1011;
-	localparam NOT		= 4'b1100;
-	// Unused			= 4'b1101;
-	// Unused			= 4'b1110;
-	localparam NOOP		= 4'b1111;
+	localparam LSH		= 4'b1001; // LSH, LSHI
+	localparam ASH		= 4'b1010; // ALSH
+	localparam MOV 	= 4'b1011;
+	localparam NOT		= 4'b1100; // NOT
+	// Unused			= 4'b1101; // 
+	// Unused			= 4'b1110; // 
+	localparam NOOP	= 4'b1111; // NOP/WAIT
 	
 	reg carry_or_borrow_flag, unsigned_less_than_flag, signed_less_than_flag, signed_overflow_flag, equality_flag;
-	assign flags = {carry_or_borrow_flag, unsigned_less_than_flag, signed_less_than_flag, signed_overflow_flag, equality_flag};
+	assign flags = {	carry_or_borrow_flag, 
+							unsigned_less_than_flag,
+							signed_less_than_flag,
+							signed_overflow_flag,
+							equality_flag
+						};
 	
+
 	
 	always@(*) begin
 	
@@ -133,12 +146,19 @@ module ALU #(parameter WIDTH = 16) (
 					result = $signed(lhs) >>> ((~rhs) + 1'b1);
 			end
 			
-			PASS:
+			MOV:
 				result = rhs;
 			
 			NOT:
 				result = ~lhs;
 			
+			// unused 4'b1101
+			
+			// Unused 4'b1110
+			
+			NOOP:
+				result = {WIDTH{1'b0}};
+				
 			default:
 				result = {WIDTH{1'b0}};
 		endcase
