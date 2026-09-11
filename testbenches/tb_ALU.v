@@ -1,329 +1,604 @@
 `timescale 1ns/1ps
 
-/*
- * Each test applies inputs, waits 10 ns, and checks the outputs with an if statement.
- */
 module tb_ALU;
 
     localparam WIDTH = 16;
 
-    localparam [3:0] ZEXT = 4'b0000;
-    localparam [3:0] SEXT = 4'b0001;
-    localparam [3:0] ADD  = 4'b0010;
-    localparam [3:0] SUB  = 4'b0011;
-    localparam [3:0] AND  = 4'b0100;
-    localparam [3:0] OR   = 4'b0101;
-    localparam [3:0] XOR  = 4'b0110;
-    localparam [3:0] MULT = 4'b0111;
-    localparam [3:0] LUI  = 4'b1000;
-    localparam [3:0] LSH  = 4'b1001;
-    localparam [3:0] ASH  = 4'b1010;
-    localparam [3:0] PASS = 4'b1011;
-    localparam [3:0] NOT  = 4'b1100;
+    /*
+        ALU configuration values must match ALU.v.
+    */
 
-    reg [3:0] alu_op;
+    localparam ADD     = 5'd0;
+    localparam ADDI    = 5'd1;
+    localparam ADDU    = 5'd2;
+    localparam ADDUI   = 5'd3;
+    localparam ADDC    = 5'd4;
+    localparam ADDCI   = 5'd5;
+    localparam ADDCU   = 5'd6;
+    localparam ADDCUI  = 5'd7;
+
+    localparam SUB     = 5'd8;
+    localparam SUBI    = 5'd9;
+    localparam CMP     = 5'd10;
+    localparam CMPI    = 5'd11;
+    localparam CMPU    = 5'd12;
+
+    localparam AND_OP  = 5'd13;
+    localparam ANDI    = 5'd14;
+    localparam OR_OP   = 5'd15;
+    localparam ORI     = 5'd16;
+    localparam XOR_OP  = 5'd17;
+    localparam XORI    = 5'd18;
+
+    localparam MOV     = 5'd19;
+    localparam MOVI    = 5'd20;
+    localparam MUL     = 5'd21;
+    localparam MULI    = 5'd22;
+
+    localparam LSH     = 5'd23;
+    localparam LSHI    = 5'd24;
+    localparam ASHU    = 5'd25;
+    localparam ASHUI   = 5'd26;
+
+    localparam LUI     = 5'd27;
+    localparam SNXB    = 5'd28;
+    localparam ZRXB    = 5'd29;
+    localparam NOT_OP  = 5'd30;
+    localparam NO_OP   = 5'd31;
+
+    /*
+        Inputs to the ALU.
+    */
+
+    reg [4:0] alu_config;
     reg [WIDTH-1:0] lhs;
-    reg [WIDTH-1:0] rhs;
+    reg [WIDTH-1:0] regfile_rhs;
+    reg [7:0] immediate_bits;
+    reg R_type;
+    reg sign_extend_immediate;
     reg carryin;
+
+    /*
+        Outputs from the ALU.
+    */
 
     wire [WIDTH-1:0] result;
     wire [4:0] flags;
 
-    integer test_number;
-    integer error_count;
+    /*
+        Expected values calculated by the testbench.
+    */
+
+    reg [WIDTH-1:0] expected_rhs;
+    reg [WIDTH-1:0] expected_result;
+    reg [WIDTH:0] expected_extended_result;
+    reg [4:0] expected_flags;
+
+    reg expected_carry_flag;
+    reg expected_unsigned_less_than_flag;
+    reg expected_signed_less_than_flag;
+    reg expected_signed_overflow_flag;
+    reg expected_equality_flag;
+
+    /*
+        Directed lhs values include important signed and unsigned
+        boundary cases.
+    */
+
+    reg [WIDTH-1:0] lhs_values [0:15];
+
+    integer operation_number;
+    integer lhs_number;
+    integer operand_number;
+    integer carry_number;
+
+    integer number_of_tests;
+    integer number_of_errors;
+
+    /*
+        Device under test.
+    */
 
     ALU #(
         .WIDTH(WIDTH)
     ) dut (
-        .alu_op(alu_op),
+        .alu_config(alu_config),
         .lhs(lhs),
-        .rhs(rhs),
+        .regfile_rhs(regfile_rhs),
+        .immediate_bits(immediate_bits),
+        .R_type(R_type),
+        .sign_extend_immediate(sign_extend_immediate),
         .carryin(carryin),
         .result(result),
         .flags(flags)
     );
 
     initial begin
-        test_number = 0;
-        error_count = 0;
-        alu_op = 4'b0000;
-        lhs = 16'h0000;
-        rhs = 16'h0000;
-        carryin = 1'b0;
-        #10;
 
-        /* Test 1: zero-extend byte 0x80. */
-        test_number = 1;
-        alu_op = ZEXT;
-        lhs = 16'hAAAA;
-        rhs = 16'h1280;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h0080) || (flags !== 5'b00000)) begin
-            $display("FAIL test 1 ZEXT: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
+        number_of_tests = 0;
+        number_of_errors = 0;
+
+        /*
+            Initialize important lhs values.
+        */
+
+        lhs_values[0]  = 16'h0000;
+        lhs_values[1]  = 16'h0001;
+        lhs_values[2]  = 16'h0002;
+        lhs_values[3]  = 16'h007F;
+        lhs_values[4]  = 16'h0080;
+        lhs_values[5]  = 16'h00FF;
+        lhs_values[6]  = 16'h0100;
+        lhs_values[7]  = 16'h7FFE;
+        lhs_values[8]  = 16'h7FFF;
+        lhs_values[9]  = 16'h8000;
+        lhs_values[10] = 16'h8001;
+        lhs_values[11] = 16'hFF00;
+        lhs_values[12] = 16'hFF7F;
+        lhs_values[13] = 16'hFFFE;
+        lhs_values[14] = 16'hFFFF;
+        lhs_values[15] = 16'h5555;
+
+        /*
+            Test all 32 ALU configurations.
+        */
+
+        for (
+            operation_number = 0;
+            operation_number < 32;
+            operation_number = operation_number + 1
+        ) begin
+
+            alu_config = operation_number[4:0];
+
+            /*
+                Determine whether the instruction uses regfile_rhs or
+                immediate_bits.
+            */
+
+            case (operation_number)
+
+                ADDI, ADDUI,
+                ADDCI, ADDCUI,
+                SUBI, CMPI,
+                ANDI, ORI, XORI,
+                MOVI, MULI,
+                LSHI, ASHUI,
+                LUI:
+                    R_type = 1'b0;
+
+                default:
+                    R_type = 1'b1;
+
+            endcase
+
+            /*
+                Select sign extension or zero extension for immediate
+                instructions.
+
+                ADDUI and ADDCUI still use sign-extended immediates
+                according to the supplied ISA.
+            */
+
+            case (operation_number)
+
+                ADDI, ADDUI,
+                ADDCI, ADDCUI,
+                SUBI, CMPI,
+                MULI,
+                LSHI, ASHUI:
+                    sign_extend_immediate = 1'b1;
+
+                default:
+                    sign_extend_immediate = 1'b0;
+
+            endcase
+
+            /*
+                Test each important lhs value.
+            */
+
+            for (
+                lhs_number = 0;
+                lhs_number < 16;
+                lhs_number = lhs_number + 1
+            ) begin
+
+                lhs = lhs_values[lhs_number];
+
+                /*
+                    For immediate instructions, this tests all 256 possible
+                    immediate values.
+
+                    For register instructions, it generates 256 varied
+                    register operands.
+                */
+
+                for (
+                    operand_number = 0;
+                    operand_number < 256;
+                    operand_number = operand_number + 1
+                ) begin
+
+                    immediate_bits = operand_number[7:0];
+
+                    /*
+                        Include exact arithmetic boundary values before
+                        generating additional operand patterns.
+                    */
+
+                    case (operand_number)
+
+                        0:  regfile_rhs = 16'h0000;
+                        1:  regfile_rhs = 16'h0001;
+                        2:  regfile_rhs = 16'h0002;
+                        3:  regfile_rhs = 16'h007F;
+                        4:  regfile_rhs = 16'h0080;
+                        5:  regfile_rhs = 16'h00FF;
+                        6:  regfile_rhs = 16'h0100;
+                        7:  regfile_rhs = 16'h7FFE;
+                        8:  regfile_rhs = 16'h7FFF;
+                        9:  regfile_rhs = 16'h8000;
+                        10: regfile_rhs = 16'h8001;
+                        11: regfile_rhs = 16'hFF00;
+                        12: regfile_rhs = 16'hFF7F;
+                        13: regfile_rhs = 16'hFFFE;
+                        14: regfile_rhs = 16'hFFFF;
+                        15: regfile_rhs = 16'hAAAA;
+
+                        default:
+                            regfile_rhs = {
+                                operand_number[7:0],
+                                ~operand_number[7:0]
+                            };
+
+                    endcase
+
+                    /*
+                        Test both possible carryin values for every
+                        instruction.
+
+                        Operations other than ADDC, ADDCI, ADDCU, and
+                        ADDCUI should ignore carryin.
+                    */
+
+                    for (
+                        carry_number = 0;
+                        carry_number < 2;
+                        carry_number = carry_number + 1
+                    ) begin
+
+                        carryin = carry_number[0];
+
+                        /*
+                            Determine the operand that the ALU's rhs mux
+                            should produce.
+                        */
+
+                        if (R_type) begin
+                            expected_rhs = regfile_rhs;
+                        end
+                        else if (sign_extend_immediate) begin
+                            expected_rhs = {
+                                {8{immediate_bits[7]}},
+                                immediate_bits
+                            };
+                        end
+                        else begin
+                            expected_rhs = {
+                                8'h00,
+                                immediate_bits
+                            };
+                        end
+
+                        /*
+                            Default expected outputs.
+
+                            Flag ordering from your ALU:
+
+                                flags[4] = carry
+                                flags[3] = unsigned less-than
+                                flags[2] = signed less-than
+                                flags[1] = signed overflow
+                                flags[0] = equality/result-zero
+                        */
+
+                        expected_result = 16'h0000;
+                        expected_extended_result = 17'h00000;
+
+                        expected_carry_flag = 1'b0;
+
+                        expected_unsigned_less_than_flag =
+                            (lhs < expected_rhs);
+
+                        expected_signed_less_than_flag =
+                            ($signed(lhs) < $signed(expected_rhs));
+
+                        expected_signed_overflow_flag = 1'b0;
+                        expected_equality_flag = 1'b0;
+
+                        /*
+                            Reference implementation for each ALU operation.
+                        */
+
+                        case (operation_number)
+
+                            /*
+                                Addition without carryin.
+                            */
+
+                            ADD, ADDI, ADDU, ADDUI: begin
+                                expected_extended_result =
+                                    {1'b0, lhs} +
+                                    {1'b0, expected_rhs};
+
+                                expected_result =
+                                    expected_extended_result[15:0];
+
+                                expected_carry_flag =
+                                    expected_extended_result[16];
+
+                                expected_signed_overflow_flag =
+                                    ~(lhs[15] ^ expected_rhs[15]) &
+                                     (lhs[15] ^
+                                      expected_result[15]);
+                            end
+
+                            /*
+                                Addition with carryin.
+                            */
+
+                            ADDC, ADDCI, ADDCU, ADDCUI: begin
+                                expected_extended_result =
+                                    {1'b0, lhs} +
+                                    {1'b0, expected_rhs} +
+                                    carryin;
+
+                                expected_result =
+                                    expected_extended_result[15:0];
+
+                                expected_carry_flag =
+                                    expected_extended_result[16];
+
+                                expected_signed_overflow_flag =
+                                    ~(lhs[15] ^ expected_rhs[15]) &
+                                     (lhs[15] ^
+                                      expected_result[15]);
+                            end
+
+                            /*
+                                Subtraction and comparison.
+                            */
+
+                            SUB, SUBI, CMP, CMPI, CMPU: begin
+                                expected_extended_result =
+                                    {1'b0, lhs} +
+                                    {1'b0, ~expected_rhs} +
+                                    1'b1;
+
+                                expected_result =
+                                    expected_extended_result[15:0];
+
+                                expected_carry_flag =
+                                    expected_extended_result[16];
+
+                                expected_signed_overflow_flag =
+                                    (lhs[15] ^ expected_rhs[15]) &
+                                   ~(expected_result[15] ^
+                                     expected_rhs[15]);
+                            end
+
+                            AND_OP, ANDI: begin
+                                expected_result =
+                                    lhs & expected_rhs;
+                            end
+
+                            OR_OP, ORI: begin
+                                expected_result =
+                                    lhs | expected_rhs;
+                            end
+
+                            XOR_OP, XORI: begin
+                                expected_result =
+                                    lhs ^ expected_rhs;
+                            end
+
+                            MOV, MOVI: begin
+                                expected_result = expected_rhs;
+                            end
+
+                            /*
+                                The product is truncated to 16 bits.
+                            */
+
+                            MUL, MULI: begin
+                                expected_result =
+                                    lhs * expected_rhs;
+                            end
+
+                            /*
+                                Signed shift amount:
+
+                                    Positive = shift left
+                                    Negative = logical shift right
+                            */
+
+                            LSH, LSHI: begin
+                                if (expected_rhs[15] == 1'b0) begin
+                                    expected_result =
+                                        lhs << expected_rhs;
+                                end
+                                else begin
+                                    expected_result =
+                                        lhs >>
+                                        ((~expected_rhs) + 1'b1);
+                                end
+                            end
+
+                            /*
+                                Signed shift amount:
+
+                                    Positive = shift left
+                                    Negative = arithmetic shift right
+                            */
+
+                            ASHU, ASHUI: begin
+                                if (expected_rhs[15] == 1'b0) begin
+                                    expected_result =
+                                        lhs << expected_rhs;
+                                end
+                                else begin
+                                    expected_result =
+                                        $signed(lhs) >>>
+                                        ((~expected_rhs) + 1'b1);
+                                end
+                            end
+
+                            LUI: begin
+                                expected_result = {
+                                    expected_rhs[7:0],
+                                    8'h00
+                                };
+                            end
+
+                            SNXB: begin
+                                expected_result = {
+                                    {8{expected_rhs[7]}},
+                                    expected_rhs[7:0]
+                                };
+                            end
+
+                            ZRXB: begin
+                                expected_result = {
+                                    8'h00,
+                                    expected_rhs[7:0]
+                                };
+                            end
+
+                            /*
+                                This matches your implementation:
+                                    result = ~lhs
+                            */
+
+                            NOT_OP: begin
+                                expected_result = ~lhs;
+                            end
+
+                            NO_OP: begin
+                                expected_result = 16'h0000;
+                            end
+
+                            default: begin
+                                expected_result = 16'h0000;
+                            end
+
+                        endcase
+
+                        /*
+                            Your equality flag indicates result == 0.
+                        */
+
+                        expected_equality_flag =
+                            (expected_result == 16'h0000);
+
+                        expected_flags = {
+                            expected_carry_flag,
+                            expected_unsigned_less_than_flag,
+                            expected_signed_less_than_flag,
+                            expected_signed_overflow_flag,
+                            expected_equality_flag
+                        };
+
+                        /*
+                            Allow combinational signals to settle.
+                        */
+
+                        #1;
+
+                        number_of_tests = number_of_tests + 1;
+
+                        /*
+                            Case inequality detects incorrect values as well
+                            as X and Z outputs.
+                        */
+
+                        if (
+                            (result !== expected_result) ||
+                            (flags !== expected_flags)
+                        ) begin
+
+                            number_of_errors =
+                                number_of_errors + 1;
+
+                            $display(
+                                "ERROR test=%0d op=%0d",
+                                number_of_tests,
+                                operation_number
+                            );
+
+                            $display(
+                                "  R_type=%b sign_extend=%b carryin=%b",
+                                R_type,
+                                sign_extend_immediate,
+                                carryin
+                            );
+
+                            $display(
+                                "  lhs=%h regfile_rhs=%h immediate=%h",
+                                lhs,
+                                regfile_rhs,
+                                immediate_bits
+                            );
+
+                            $display(
+                                "  effective rhs=%h",
+                                expected_rhs
+                            );
+
+                            $display(
+                                "  expected result=%h flags=%b",
+                                expected_result,
+                                expected_flags
+                            );
+
+                            $display(
+                                "  actual   result=%h flags=%b",
+                                result,
+                                flags
+                            );
+
+                            /*
+                                Stop after 100 errors so one mistake does not
+                                produce thousands of console messages.
+                            */
+
+                            if (number_of_errors >= 100) begin
+                                $display("");
+                                $display(
+                                    "STOPPED AFTER 100 ERRORS"
+                                );
+                                $finish;
+                            end
+                        end
+                    end
+                end
+            end
         end
 
-        /* Test 2: sign-extend negative byte 0x80. */
-        test_number = 2;
-        alu_op = SEXT;
-        lhs = 16'hAAAA;
-        rhs = 16'h1280;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hFF80) || (flags !== 5'b00000)) begin
-            $display("FAIL test 2 SEXT: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
+        $display("");
+        $display("========================================");
+        $display("ALU TESTBENCH COMPLETE");
+        $display("Tests performed: %0d", number_of_tests);
+        $display("Errors found:    %0d", number_of_errors);
 
-        /* Test 3: ordinary addition without flags. */
-        test_number = 3;
-        alu_op = ADD;
-        lhs = 16'h1234;
-        rhs = 16'h4321;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h5555) || (flags !== 5'b00000)) begin
-            $display("FAIL test 3 ADD: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 4: addition producing an unsigned carry. */
-        test_number = 4;
-        alu_op = ADD;
-        lhs = 16'hFFFF;
-        rhs = 16'h0001;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h0000) || (flags !== 5'b10000)) begin
-            $display("FAIL test 4 ADD carry: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 5: positive signed-addition overflow. */
-        test_number = 5;
-        alu_op = ADD;
-        lhs = 16'h7FFF;
-        rhs = 16'h0001;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h8000) || (flags !== 5'b00010)) begin
-            $display("FAIL test 5 ADD overflow: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 6: addition using carryin, as required by ADDC. */
-        test_number = 6;
-        alu_op = ADD;
-        lhs = 16'hFFFF;
-        rhs = 16'h0000;
-        carryin = 1'b1;
-        #10;
-        if ((result !== 16'h0000) || (flags !== 5'b10000)) begin
-            $display("FAIL test 6 ADDC: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 7: ordinary subtraction. */
-        test_number = 7;
-        alu_op = SUB;
-        lhs = 16'h0005;
-        rhs = 16'h0003;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h0002) || (flags !== 5'b00000)) begin
-            $display("FAIL test 7 SUB: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 8: subtraction with unsigned and signed lhs < rhs. */
-        test_number = 8;
-        alu_op = SUB;
-        lhs = 16'h0003;
-        rhs = 16'h0005;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hFFFE) || (flags !== 5'b11100)) begin
-            $display("FAIL test 8 SUB borrow: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 9: equal operands for CMP behavior. */
-        test_number = 9;
-        alu_op = SUB;
-        lhs = 16'hABCD;
-        rhs = 16'hABCD;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h0000) || (flags !== 5'b00001)) begin
-            $display("FAIL test 9 CMP equal: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 10: signed subtraction overflow: -32768 - 1. */
-        test_number = 10;
-        alu_op = SUB;
-        lhs = 16'h8000;
-        rhs = 16'h0001;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h7FFF) || (flags !== 5'b00110)) begin
-            $display("FAIL test 10 SUB overflow: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 11: subtracting the carry/borrow input. */
-        test_number = 11;
-        alu_op = SUB;
-        lhs = 16'h0000;
-        rhs = 16'h0000;
-        carryin = 1'b1;
-        #10;
-        if ((result !== 16'hFFFF) ||
-            ((flags & 5'b10010) !== 5'b10000)) begin
-            $display("FAIL test 11 SUBC: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 12: bitwise AND. */
-        test_number = 12;
-        alu_op = AND;
-        lhs = 16'hA55A;
-        rhs = 16'h0FF0;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h0550) || (flags !== 5'b00000)) begin
-            $display("FAIL test 12 AND: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 13: bitwise OR. This operation also covers ISA NOP behavior. */
-        test_number = 13;
-        alu_op = OR;
-        lhs = 16'hA500;
-        rhs = 16'h005A;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hA55A) || (flags !== 5'b00000)) begin
-            $display("FAIL test 13 OR: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 14: bitwise XOR. */
-        test_number = 14;
-        alu_op = XOR;
-        lhs = 16'hAAAA;
-        rhs = 16'h0FF0;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hA55A) || (flags !== 5'b00000)) begin
-            $display("FAIL test 14 XOR: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 15: multiplication uses the complete 16-bit operands. */
-        test_number = 15;
-        alu_op = MULT;
-        lhs = 16'h0100;
-        rhs = 16'h0002;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h0200) || (flags !== 5'b00000)) begin
-            $display("FAIL test 15 MULT: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 16: multiplication truncates the upper product bits. */
-        test_number = 16;
-        alu_op = MULT;
-        lhs = 16'hFFFF;
-        rhs = 16'h0002;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hFFFE) || (flags !== 5'b00000)) begin
-            $display("FAIL test 16 MULT truncation: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 17: load immediate into the upper byte. */
-        test_number = 17;
-        alu_op = LUI;
-        lhs = 16'hAAAA;
-        rhs = 16'h12CD;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hCD00) || (flags !== 5'b00000)) begin
-            $display("FAIL test 17 LUI: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 18: positive logical shift amount means shift left. */
-        test_number = 18;
-        alu_op = LSH;
-        lhs = 16'h1234;
-        rhs = 16'h0004;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h2340) || (flags !== 5'b00000)) begin
-            $display("FAIL test 18 LSH left: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 19: -1 logical shift means shift right by one with zero fill. */
-        test_number = 19;
-        alu_op = LSH;
-        lhs = 16'h8001;
-        rhs = 16'hFFFF;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h4000) || (flags !== 5'b00000)) begin
-            $display("FAIL test 19 LSH right: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 20: arithmetic right shift repeats the sign bit. */
-        test_number = 20;
-        alu_op = ASH;
-        lhs = 16'h8001;
-        rhs = 16'hFFFF;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hC000) || (flags !== 5'b00000)) begin
-            $display("FAIL test 20 ASH right: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 21: PASS returns rhs for MOV and MOVI. */
-        test_number = 21;
-        alu_op = PASS;
-        lhs = 16'hAAAA;
-        rhs = 16'h1234;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'h1234) || (flags !== 5'b00000)) begin
-            $display("FAIL test 21 PASS: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        /* Test 22: custom NOT operates on lhs. */
-        test_number = 22;
-        alu_op = NOT;
-        lhs = 16'h0F0F;
-        rhs = 16'hAAAA;
-        carryin = 1'b0;
-        #10;
-        if ((result !== 16'hF0F0) || (flags !== 5'b00000)) begin
-            $display("FAIL test 22 NOT: result=%h flags=%b", result, flags);
-            error_count = error_count + 1;
-        end
-
-        if (error_count == 0)
-            $display("ALU_TEST_PASS: all %0d tests passed", test_number);
+        if (number_of_errors == 0)
+            $display("RESULT: PASS");
         else
-            $display("ALU_TEST_FAIL: %0d of %0d tests failed",
-                     error_count, test_number);
+            $display("RESULT: FAIL");
 
-        // $finish;
+        $display("========================================");
+
+        $finish;
     end
 
 endmodule
