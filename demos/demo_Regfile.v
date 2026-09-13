@@ -13,35 +13,12 @@ module demo_Regfile
 	
 	// Internal connecting wires
 	wire [3:0] rhs_selector, lhs_selector;
-	wire [15:0] rhs, lhs, ALU_output, write_BUS;
+	wire [15:0] rhs, lhs, ALU_output, wen;
 	wire [7:0] alu_config;
 	
-	reg load;
-	reg [15:0] write_enable, mem_reg;
-	wire [15:0] wen, we;
-	
-	assign write_BUS = (load)? mem_reg : ALU_output;
-	assign we = (load)? write_enable : wen;
-	
-	
-	// Register file including the initial loading/startup.
-	Regfile rf(.clock(clk), .reset(rst), .Rsrc_address(rhs_selector), .Rdest_address(lhs_selector),
-		.write_enable(we), .write_data(write_BUS), .Rsrc_data(rhs), .Rdest_data(lhs));
-	reg [15:0] memdata [0:15];
-	integer i;
-	initial begin
-		$readmemh("memory_files/16by16regfile.txt", memdata);
-		@(negedge rst);
-		load = 1;
-		for(i = 0; i < 16; i = i + 1) begin
-			@(posedge clk);
-			mem_reg = memdata[i];
-			write_enable = 16'b1 << i;
-		end
-		@(posedge clk);
-		write_enable = 16'b0;
-		load = 0;
-	end
+	// Register file
+	Regfile rf(.clock(clk), .reset(~rst), .Rsrc_address(rhs_selector), .Rdest_address(lhs_selector),
+		.write_enable(wen), .write_data(ALU_output), .Rsrc_data(rhs), .Rdest_data(lhs));
 
 	// ALU
 	ALU alu(.alu_config(alu_config[4:0]), .lhs(lhs), .regfile_rhs(rhs), .immediate_bits(slide_switches),
@@ -49,14 +26,14 @@ module demo_Regfile
 		.result(ALU_output), .flags(alu_flags));
 		
 	// HexTo7Seg
-	hex_to_seven_segment htss0(.hex_value(write_BUS[3:0]), .segments(seg0));
-	hex_to_seven_segment htss1(.hex_value(write_BUS[7:4]), .segments(seg1));
-	hex_to_seven_segment htss2(.hex_value(write_BUS[11:8]), .segments(seg2));
-	hex_to_seven_segment htss3(.hex_value(write_BUS[15:12]), .segments(seg3));
+	hex_to_seven_segment htss0(.hex_value(ALU_output[3:0]), .segments(seg0));
+	hex_to_seven_segment htss1(.hex_value(ALU_output[7:4]), .segments(seg1));
+	hex_to_seven_segment htss2(.hex_value(ALU_output[11:8]), .segments(seg2));
+	hex_to_seven_segment htss3(.hex_value(ALU_output[15:12]), .segments(seg3));
 		
 	// Moore FSM
 	regfile_alu_test_fsm fsm(
-		.clk(clk), .rst(rst), .load(load), .view_select(slide_switches[3:0]),
+		.clk(clk), .rst(~rst), .view_select(slide_switches[3:0]),
 		.rhs_selector(rhs_selector), .lhs_selector(lhs_selector),
 		.wen(wen), .alu_config(alu_config)
 	);
@@ -96,12 +73,11 @@ endmodule
 module regfile_alu_test_fsm (
     input              clk,
     input              rst,
-    input              load,         // demo_Regfile's loader reg: 1 while preloading, 0 once done
-    input      [3:0]   view_select,  // slide_switches[3:0]; register to inspect once testing ends
+    input      [3:0]   view_select,  // slide_switches[3:0]
 
-    output reg [3:0]   rhs_selector, // Regfile Rsrc_address
-    output reg [3:0]   lhs_selector, // Regfile Rdest_address
-    output reg [15:0]  wen,          // Regfile write_enable
+    output reg [3:0]   rhs_selector,
+    output reg [3:0]   lhs_selector,
+    output reg [15:0]  wen,
     output reg [7:0]   alu_config    // {carryin, sign_extend_immediate, R_type, opcode[4:0]}
 );
 
@@ -112,31 +88,39 @@ module regfile_alu_test_fsm (
                LSHI=5'd24,ASHU=5'd25, ASHUI=5'd26,LUI=5'd27,  SNXB=5'd28, ZRXB=5'd29,
                NOT=5'd30, NO_OP=5'd31;
 
-    localparam S_WAIT_LOAD = 2'd0,
-               S_RUN       = 2'd1,
-               S_DISPLAY   = 2'd2;
+    localparam ACC_REG  = 4'd14; // running accumulator during load; fixed known operand during run
+    localparam ZERO_REG = 4'd15; // stays 0 forever (never written) - the '+1' source for ADDC
+
+    localparam S_LOAD    = 2'd0,
+               S_RUN     = 2'd1,
+               S_DISPLAY = 2'd2;
+
+    localparam LAST_LOAD_STEP = 5'd27; // 14 regs x 2 ops (increment, copy) - 1
 
     reg [1:0] state;
+    reg [4:0] load_step;
     reg [4:0] op_index;
-    reg       seen_load;
     reg [3:0] view_reg;
 
-    wire [3:0] dest_reg = op_index % 5'd15; // cycles R0..R14; R15 held aside as a known operand
+    wire       load_is_copy  = load_step[0];       // odd steps copy; even steps increment
+    wire [3:0] load_target   = load_step[4:1];      // 0..13, one target reg per pair of steps
+    wire [3:0] dest_reg      = op_index % 5'd14;    // cycles R0..R13; R14/R15 reserved
 
     // ---- state register ----
     always @(posedge clk) begin
         if (rst) begin
-            state     <= S_WAIT_LOAD;
+            state     <= S_LOAD;
+            load_step <= 5'd0;
             op_index  <= 5'd0;
-            seen_load <= 1'b0;
             view_reg  <= 4'd0;
         end else begin
             case (state)
-                S_WAIT_LOAD: begin
-                    if (load)
-                        seen_load <= 1'b1;          // confirm we actually saw the loader run
-                    else if (seen_load)
-                        state <= S_RUN;
+                S_LOAD: begin
+                    if (load_step == LAST_LOAD_STEP) begin
+                        state    <= S_RUN;
+                        op_index <= 5'd0;
+                    end else
+                        load_step <= load_step + 5'd1;
                 end
 
                 S_RUN: begin
@@ -147,35 +131,53 @@ module regfile_alu_test_fsm (
                 end
 
                 S_DISPLAY: begin
-                    state    <= S_DISPLAY;     // park here forever
-                    view_reg <= view_select;   // registered -> keeps this Moore, not Mealy
+                    state    <= S_DISPLAY;
+                    view_reg <= view_select;
                 end
             endcase
         end
     end
 
-    // ---- Moore outputs: function of state + registered op_index/view_reg only ----
+    // ---- Moore outputs: function of state + registered counters only ----
     always @(*) begin
-        rhs_selector = 4'hF;        // fixed, known operand for every R-type op
+        rhs_selector = ACC_REG;
         lhs_selector = dest_reg;
         wen          = 16'b0;
         alu_config   = {3'b000, NO_OP};
 
         case (state)
+            S_LOAD: begin
+                if (!load_is_copy) begin
+                    // R14 <= R14 + R15(=0) + 1   (ADDC, R-type, carryin forced high)
+                    lhs_selector = ACC_REG;
+                    rhs_selector = ZERO_REG;
+                    wen          = (16'b1 << ACC_REG);
+                    alu_config   = {cfg_bits(ADDC), ADDC};
+                end else begin
+                    // R[target] <= R14           (MOV, R-type)
+                    lhs_selector = load_target;
+                    rhs_selector = ACC_REG;
+                    wen          = (16'b1 << load_target);
+                    alu_config   = {cfg_bits(MOV), MOV};
+                end
+            end
+
             S_RUN: begin
                 lhs_selector = dest_reg;
+                rhs_selector = ACC_REG;             // fixed known operand (=14) for R-type ops
                 wen          = (16'b1 << dest_reg);
                 alu_config   = {cfg_bits(op_index), op_index};
             end
+
             S_DISPLAY: begin
-                lhs_selector = view_reg;
-                wen          = 16'b0;
-            end
-            default: ; // S_WAIT_LOAD: outputs stay at their safe defaults above
+					lhs_selector = dest_reg;              // unused/don't-care for MOV, left harmless
+					rhs_selector = view_reg;              // <-- this is what MOV reads
+					wen          = 16'b0;
+					alu_config   = {cfg_bits(MOV), MOV};  // ALU_output = regs[view_reg]
+				end
         endcase
     end
 
-    // {carryin, sign_extend_immediate, R_type} per opcode, verified against ALU.v's rhs mux
     function [2:0] cfg_bits;
         input [4:0] op;
         begin
