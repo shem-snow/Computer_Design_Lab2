@@ -70,15 +70,30 @@ module hex_to_seven_segment (
 
 endmodule
 
+/*
+	This FSM test module goes throught three states:
+	1: load
+		uses R[14] to count up to 27.
+		on even numbers, R[14] increments
+		on odd numbers, R[i] = R[14]
+	2: run:
+		uses "dest_reg" to select each of the 16 registers
+		uses the "load_step" internal wire to count throught each ALU opertaion (0-31 for my 5-bit ALU_op)
+		continues to increment R[14]
+		performs Rdest <- regfile[load_step] ALU_op regfile[14]
+		
+	3: display
+		uses the slide switches [3:0] to view each register.
+*/
 module regfile_alu_test_fsm (
     input              clk,
     input              rst,
-    input      [3:0]   view_select,  // slide_switches[3:0]
+    input      [3:0]   view_select,  // slide_switches[3:0] used in the final state to view register values.
 
-    output reg [3:0]   rhs_selector,
-    output reg [3:0]   lhs_selector,
-    output reg [15:0]  wen,
-    output reg [7:0]   alu_config    // {carryin, sign_extend_immediate, R_type, opcode[4:0]}
+    output reg [3:0]   rhs_selector, // ALU_b
+    output reg [3:0]   lhs_selector, // ALU_a
+    output reg [15:0]  wen,			 // write_enable
+    output reg [7:0]   alu_config    // bits to select the ALU operation.
 );
 
     localparam ADD=5'd0,  ADDI=5'd1,  ADDU=5'd2,  ADDUI=5'd3,  ADDC=5'd4,  ADDCI=5'd5,
@@ -88,25 +103,24 @@ module regfile_alu_test_fsm (
                LSHI=5'd24,ASHU=5'd25, ASHUI=5'd26,LUI=5'd27,  SNXB=5'd28, ZRXB=5'd29,
                NOT=5'd30, NO_OP=5'd31;
 
-    localparam ACC_REG  = 4'd14; // running accumulator during load; fixed known operand during run
-    localparam ZERO_REG = 4'd15; // stays 0 forever (never written) - the '+1' source for ADDC
-
-    localparam S_LOAD    = 2'd0,
-               S_RUN     = 2'd1,
-               S_DISPLAY = 2'd2;
-
-    localparam LAST_LOAD_STEP = 5'd27; // 14 regs x 2 ops (increment, copy) - 1
+    // R15 is always zero and R14 is my accumulator variable during loading until the
+	 // end when it becomes the fixed "known operand" for R-type opcodes.
+    localparam ZERO_REG = 4'd15;
+	 localparam ACC_REG = 4'd14;
+	
+	 // There are 3 states in this FSM.
+    localparam S_LOAD    = 2'd0, // Load known values into the regfile.
+               S_RUN     = 2'd1, // Run a program that does the same operations every time.
+               S_DISPLAY = 2'd2; // Use the slide switches to view the results in each register.
 
     reg [1:0] state;
     reg [4:0] load_step;
     reg [4:0] op_index;
     reg [3:0] view_reg;
 
-    wire       load_is_copy  = load_step[0];       // odd steps copy; even steps increment
-    wire [3:0] load_target   = load_step[4:1];      // 0..13, one target reg per pair of steps
-    wire [3:0] dest_reg      = op_index % 5'd14;    // cycles R0..R13; R14/R15 reserved
+    wire [3:0] dest_reg = op_index % 5'd14; // cycle through R0-R13 twice
 
-    // ---- state register ----
+    // Next state logic
     always @(posedge clk) begin
         if (rst) begin
             state     <= S_LOAD;
@@ -116,7 +130,7 @@ module regfile_alu_test_fsm (
         end else begin
             case (state)
                 S_LOAD: begin
-                    if (load_step == LAST_LOAD_STEP) begin
+                    if (load_step == 5'd27) begin // going twice the number of registers we're writing
                         state    <= S_RUN;
                         op_index <= 5'd0;
                     end else
@@ -124,7 +138,7 @@ module regfile_alu_test_fsm (
                 end
 
                 S_RUN: begin
-                    if (op_index == 5'd31)
+                    if (op_index == 5'd31) // opcode for NO_OP
                         state <= S_DISPLAY;
                     else
                         op_index <= op_index + 5'd1;
@@ -138,8 +152,10 @@ module regfile_alu_test_fsm (
         end
     end
 
-    // ---- Moore outputs: function of state + registered counters only ----
+    // Output logic
     always @(*) begin
+		  
+		  // default values
         rhs_selector = ACC_REG;
         lhs_selector = dest_reg;
         wen          = 16'b0;
@@ -147,37 +163,44 @@ module regfile_alu_test_fsm (
 
         case (state)
             S_LOAD: begin
-                if (!load_is_copy) begin
-                    // R14 <= R14 + R15(=0) + 1   (ADDC, R-type, carryin forced high)
+					 // on even steps, increment
+                if (!load_step[0]) begin
                     lhs_selector = ACC_REG;
                     rhs_selector = ZERO_REG;
                     wen          = (16'b1 << ACC_REG);
                     alu_config   = {cfg_bits(ADDC), ADDC};
-                end else begin
-                    // R[target] <= R14           (MOV, R-type)
-                    lhs_selector = load_target;
+                end
+					 // on odd steps, dump R14's current count into whichever register we're loading
+					 else begin
+                    lhs_selector = load_step[4:1];
                     rhs_selector = ACC_REG;
-                    wen          = (16'b1 << load_target);
+                    wen          = (16'b1 << load_step[4:1]);
                     alu_config   = {cfg_bits(MOV), MOV};
                 end
             end
 
             S_RUN: begin
+                // one opcode per register per clock, opcode number IS op_index
                 lhs_selector = dest_reg;
-                rhs_selector = ACC_REG;             // fixed known operand (=14) for R-type ops
+                rhs_selector = ACC_REG; // R14 now becomes known constant operand for R-type ops
                 wen          = (16'b1 << dest_reg);
                 alu_config   = {cfg_bits(op_index), op_index};
             end
 
             S_DISPLAY: begin
-					lhs_selector = dest_reg;              // unused/don't-care for MOV, left harmless
-					rhs_selector = view_reg;              // <-- this is what MOV reads
-					wen          = 16'b0;
-					alu_config   = {cfg_bits(MOV), MOV};  // ALU_output = regs[view_reg]
-				end
+                // just MOV the selected register through the ALU so the display
+                // (which reads ALU_output) shows regs[view_reg] untouched
+                lhs_selector = dest_reg;            // don't-care for MOV, left alone
+                rhs_selector = view_reg;
+                wen          = 16'b0;               // never write during display
+                alu_config   = {cfg_bits(MOV), MOV};
+            end
         endcase
     end
 
+    // {carryin, sign_extend_immediate, R_type} per opcode
+	 // between the localparams and this function, you can specify your ALU opcodes here.
+	 // to use, append like: { cfg_bits(opcode_name), opcode_name}
     function [2:0] cfg_bits;
         input [4:0] op;
         begin
