@@ -13,3 +13,7 @@ Some design decisions made along the way:
       course instructions specified placing the decoder inside the ALU. When I get around to making the processor superscaler, I'll likely change this.
   3. Number of write_enable signals at the register file.
       Only one write is needed for this ISA. Using multiple write_enables adds more FSM control signals. However, course instruction says to have multiple.
+  4. Memory read-during-write mode.
+      Memory.v has a WRITE_FIRST parameter. Write-first ("new data") is the default in Quartus' true dual-port template and it means a value written on a 
+      port is what that port immediately reads back. testbenches/tb_Memory.v runs both modes side by side.
+      The test FSM in demos/demo_Memory.v never reads an address on the same edge it writes it, so it works in either mode.
