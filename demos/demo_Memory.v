@@ -1,5 +1,5 @@
 /*
- * FPGA demonstration for Lab 3: read-modify-write-read on the dual-port Block-RAM.
+ * FPGA demonstration for the DualPortMemory module: read-modify-write-read on the dual-port Block-RAM.
  *
  * Inputs:
  * 	KEY[0] (rst) = reset, active-low. Resets the FSM only. The RAM keeps its contents
@@ -15,12 +15,18 @@
  * 	LEDR[8:2] = last run: per-location pass bits (LEDR[2] = test 0 ... LEDR[8] = test 6)
  * 	LEDR[9]   = last run: at least one location FAILED
  *
- * Demo:
- * 	1. Set SW to 0x000 -> HEX shows A000 (initial value from lab3_memory_init.txt).
- * 	   Try 0x1FE, 0x1FF, 0x200, 0x201 too (A1FE, A1FF, A200, A201).
- * 	2. Press KEY[1]. The FSM reads each test word on port A, adds 0x1000, writes it back
- * 	   on port A, re-reads it on port B, and checks it. HEX now shows B000, B1FE, ...
- * 	3. Every press adds another 0x1000 (C000, D000, ...). Untouched words (e.g. 0x003) never change.
+ * What the demo does:
+ * 	0.	When you first flash the board, RAM is holding a small memory of 1,024 numbers filled from lab3_memory_init.txt.
+ * 		Almost every address holds its own address as its value (address 3 holds 0003, address 1023 holds 03FF), so you can check the addressing is right.
+ * 		Seven "test" addresses hold values that start with A: 0, 1, 2, 510, 511, 512 and 513. 510–513 are included because they sit where we expect the split between the two memory blocks.
+ * 
+ * 	1.	The slide switches allow you specify addresses whose values will be displayed at Hex[3:0].
+ * 		The low byte of the address is displayed at Hex[5:4].
+ * 
+ * 	2. Each press of the KEY[1] button adds 0x1000 to the values at the seven test addresses then writes it back,
+ * 		then reads it again through the memory's other port to check it. The LEDs all light up to indicate success.
+ * 		That's the "read, modify, write, read again" the lab asks for.
+ * 		The test only rewrites seven addresses: 0, 1, 2, 510, 511, 512 and 513. Every other address keeps its starting value forever 
  */
 module demo_Memory
 (
