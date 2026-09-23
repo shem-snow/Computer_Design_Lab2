@@ -33,7 +33,7 @@
  * INIT_FILE is loaded with $readmemh. Quartus resolves the relative path from the project folder.
  * Initial contents only come from the FPGA bitstream: pressing reset does NOT restore them.
  */
-module Memory #(
+module DualPortMemory #(
 	parameter DATA_WIDTH  = 16,
 	parameter ADDR_WIDTH  = 10,
 	parameter WRITE_FIRST = 1,
