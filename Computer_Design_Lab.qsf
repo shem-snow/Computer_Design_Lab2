@@ -40,7 +40,7 @@
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEMA5F31C6
-set_global_assignment -name TOP_LEVEL_ENTITY demo_Regfile
+set_global_assignment -name TOP_LEVEL_ENTITY demo_Memory
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 23.1STD.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "20:02:44  SEPTEMBER 01, 2026"
 set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
@@ -167,10 +167,69 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg3[3]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg3[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg3[5]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg3[6]
-set_global_assignment -name VERILOG_FILE Regfile.v
-set_global_assignment -name VERILOG_FILE ALU.v
-set_global_assignment -name VERILOG_FILE demos/demo_Regfile.v
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+
+# ---- Lab 3 (demo_Memory): KEY1, SW8-9, LEDR0-9, HEX4-5 (DE1-SoC) ----
+set_location_assignment PIN_AA15 -to go
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to go
+set_location_assignment PIN_AD10 -to slide_switches[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to slide_switches[8]
+set_location_assignment PIN_AE12 -to slide_switches[9]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to slide_switches[9]
+set_location_assignment PIN_V16 -to leds[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[0]
+set_location_assignment PIN_W16 -to leds[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[1]
+set_location_assignment PIN_V17 -to leds[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[2]
+set_location_assignment PIN_V18 -to leds[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[3]
+set_location_assignment PIN_W17 -to leds[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[4]
+set_location_assignment PIN_W19 -to leds[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[5]
+set_location_assignment PIN_Y19 -to leds[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[6]
+set_location_assignment PIN_W20 -to leds[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[7]
+set_location_assignment PIN_W21 -to leds[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[8]
+set_location_assignment PIN_Y21 -to leds[9]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to leds[9]
+set_location_assignment PIN_AA24 -to seg4[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[0]
+set_location_assignment PIN_Y23 -to seg4[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[1]
+set_location_assignment PIN_Y24 -to seg4[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[2]
+set_location_assignment PIN_W22 -to seg4[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[3]
+set_location_assignment PIN_W24 -to seg4[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[4]
+set_location_assignment PIN_V23 -to seg4[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[5]
+set_location_assignment PIN_W25 -to seg4[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg4[6]
+set_location_assignment PIN_V25 -to seg5[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[0]
+set_location_assignment PIN_AA28 -to seg5[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[1]
+set_location_assignment PIN_Y27 -to seg5[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[2]
+set_location_assignment PIN_AB27 -to seg5[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[3]
+set_location_assignment PIN_AB26 -to seg5[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[4]
+set_location_assignment PIN_AA26 -to seg5[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[5]
+set_location_assignment PIN_AA25 -to seg5[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to seg5[6]
+
+set_global_assignment -name VERILOG_FILE hex_to_seven_segment.v
+set_global_assignment -name VERILOG_FILE DualPortMemory.v
+set_global_assignment -name VERILOG_FILE Regfile.v
+set_global_assignment -name VERILOG_FILE ALU.v
+set_global_assignment -name VERILOG_FILE demos/demo_Memory.v
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
