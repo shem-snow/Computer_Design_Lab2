@@ -17,3 +17,6 @@ Some design decisions made along the way:
       Memory.v has a WRITE_FIRST parameter. Write-first ("new data") is the default in Quartus' true dual-port template and it means a value written on a 
       port is what that port immediately reads back. testbenches/tb_Memory.v runs both modes side by side.
       The test FSM in demos/demo_Memory.v never reads an address on the same edge it writes it, so it works in either mode.
+  5. Return address and procedural calls:
+     In addition to designating one of the registers as the return address ($ra), I instantiated a "PC_Logic" module that manages its own 8-deep stack of 
+     return addresses.
