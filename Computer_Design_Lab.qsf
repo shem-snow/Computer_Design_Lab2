@@ -35,12 +35,12 @@
 #    and any changes you make may be lost or overwritten.
 #
 # -------------------------------------------------------------------------- #
-
-
+ 
+ 
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEMA5F31C6
-set_global_assignment -name TOP_LEVEL_ENTITY Datapath
+set_global_assignment -name TOP_LEVEL_ENTITY demo_CPU_datapath_and_fsm
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 23.1STD.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "20:02:44  SEPTEMBER 01, 2026"
 set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
@@ -61,13 +61,13 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 # Clock
 # ============================================================
 set_location_assignment PIN_AF14 -to clk
-
+ 
 # ============================================================
 # Reset (KEY0 pushbutton — ACTIVE LOW on the board;
 # your logic wants ACTIVE HIGH — invert at the top level!)
 # ============================================================
 set_location_assignment PIN_AA14 -to rst
-
+ 
 # ============================================================
 # Slide switches -> slide_switches[7:0]  (SW0..SW7 of the board's 10)
 # ============================================================
@@ -79,7 +79,7 @@ set_location_assignment PIN_AD11 -to slide_switches[4]
 set_location_assignment PIN_AD12 -to slide_switches[5]
 set_location_assignment PIN_AE11 -to slide_switches[6]
 set_location_assignment PIN_AC9 -to slide_switches[7]
-
+ 
 # ============================================================
 # alu_flags[4:0] -> LEDR0..LEDR4
 # ============================================================
@@ -88,7 +88,7 @@ set_location_assignment PIN_W16 -to alu_flags[1]
 set_location_assignment PIN_V17 -to alu_flags[2]
 set_location_assignment PIN_V18 -to alu_flags[3]
 set_location_assignment PIN_W17 -to alu_flags[4]
-
+ 
 # ============================================================
 # Seven-segment displays -> HEX0..HEX3
 # ============================================================
@@ -99,7 +99,7 @@ set_location_assignment PIN_AG27 -to seg0[3]
 set_location_assignment PIN_AF28 -to seg0[4]
 set_location_assignment PIN_AG28 -to seg0[5]
 set_location_assignment PIN_AH28 -to seg0[6]
-
+ 
 set_location_assignment PIN_AJ29 -to seg1[0]
 set_location_assignment PIN_AH29 -to seg1[1]
 set_location_assignment PIN_AH30 -to seg1[2]
@@ -107,7 +107,7 @@ set_location_assignment PIN_AG30 -to seg1[3]
 set_location_assignment PIN_AF29 -to seg1[4]
 set_location_assignment PIN_AF30 -to seg1[5]
 set_location_assignment PIN_AD27 -to seg1[6]
-
+ 
 set_location_assignment PIN_AB23 -to seg2[0]
 set_location_assignment PIN_AE29 -to seg2[1]
 set_location_assignment PIN_AD29 -to seg2[2]
@@ -115,7 +115,7 @@ set_location_assignment PIN_AC28 -to seg2[3]
 set_location_assignment PIN_AD30 -to seg2[4]
 set_location_assignment PIN_AC29 -to seg2[5]
 set_location_assignment PIN_AC30 -to seg2[6]
-
+ 
 set_location_assignment PIN_AD26 -to seg3[0]
 set_location_assignment PIN_AC27 -to seg3[1]
 set_location_assignment PIN_AD25 -to seg3[2]
@@ -123,8 +123,8 @@ set_location_assignment PIN_AC25 -to seg3[3]
 set_location_assignment PIN_AB28 -to seg3[4]
 set_location_assignment PIN_AB25 -to seg3[5]
 set_location_assignment PIN_AB22 -to seg3[6]
-
-
+ 
+ 
 # ---- Lab 3 (demo_Memory): KEY1, SW8-9, LEDR0-9, HEX4-5 (DE1-SoC) ----
 set_location_assignment PIN_AA15 -to go
 set_location_assignment PIN_AD10 -to slide_switches[8]
@@ -153,13 +153,15 @@ set_location_assignment PIN_AB27 -to seg5[3]
 set_location_assignment PIN_AB26 -to seg5[4]
 set_location_assignment PIN_AA26 -to seg5[5]
 set_location_assignment PIN_AA25 -to seg5[6]
-
+ 
+set_global_assignment -name VERILOG_FILE demos/demo_CPU_datapath_and_fsm.v
 set_global_assignment -name VERILOG_FILE Dumb_ALU.v
 set_global_assignment -name VERILOG_FILE hex_to_seven_segment.v
 set_global_assignment -name VERILOG_FILE DualPortMemory.v
 set_global_assignment -name VERILOG_FILE Regfile.v
 set_global_assignment -name VERILOG_FILE Datapath.v
 set_global_assignment -name VERILOG_FILE PC_Logic.v
+set_global_assignment -name VERILOG_FILE FSM.v
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
