@@ -207,12 +207,16 @@ module FSM_Controller (
 				if (is_load) begin
 					load = 1'b1; // address = R[Raddr]
 					en_a = 1'b1;
+					alu_config = MOV; // Common_Data_BUS = R[IR[3:0]]
+					R_type     = 1'b1;
 				end
 				else if (is_store) begin
-					store     = 1'b1; // address = R[Raddr], data = R[IR[11:8]]
+					store     = 1'b1; // address = IR[11:8], data = IR[3:0]
 					en_a      = 1'b1;
 					wen_a     = 1'b1;
 					PC_Enable = 1'b1;
+					alu_config = MOV; // Common_Data_BUS = R[IR[3:0]]
+					R_type     = 1'b1;
 				end
 				else if (is_bcond) begin
 					branch    = condition_true;
