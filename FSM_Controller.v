@@ -211,7 +211,7 @@ module FSM_Controller (
 					R_type     = 1'b1;
 				end
 				else if (is_store) begin
-					store     = 1'b1; // address = IR[11:8], data = IR[3:0]
+					store     = 1'b1; // address = IR[3:0], data = IR[11:8]
 					en_a      = 1'b1;
 					wen_a     = 1'b1;
 					PC_Enable = 1'b1;
