@@ -23,7 +23,7 @@
 		Z = Rdest == Rsrc   L = Rdest < Rsrc (unsigned)   N = Rdest < Rsrc (signed)
 		so GT means "Rsrc > Rdest", the same as the CR16 convention.
 */
-module FSM (
+module FSM_Controller (
 	input clock,
 	input reset,
 	input [15:0] instruction, // instruction_register
