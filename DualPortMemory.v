@@ -12,7 +12,8 @@
  *
  * Sizing (M10K on the Cyclone V SE A5):
  * 	1 block  = 512 words x 16 bits (internally 512 x 20, top 4 bits unused)
- * 	2 blocks = 1024 words -> ADDR_WIDTH = 10  (this lab)
+ * 	2 blocks = 1024 words -> ADDR_WIDTH = 10
+ *  4 blocks (what I'm going with) = 2048 words and 11 address bits.
  * 	Later in the project ADDR_WIDTH can grow toward 18. Note 2^18 = 262,144 words, but the
  * 	chip only has 397 * 512 = 203,264 words, so a full 18-bit memory will NOT fit.
  *
@@ -35,7 +36,7 @@
  */
 module DualPortMemory #(
 	parameter DATA_WIDTH  = 16,
-	parameter ADDR_WIDTH  = 10,
+	parameter ADDR_WIDTH  = 11,
 	parameter WRITE_FIRST = 1,
 	parameter INIT_FILE   = "memory_files/lab3_memory_init.txt"
 )	(
