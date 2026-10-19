@@ -137,8 +137,8 @@ module FSM_Controller (
 				case (ext)
 					4'b0100: begin decoded_config = LSH;  decoded_R_type = 1'b1; end
 					4'b0110: begin decoded_config = ASHU; decoded_R_type = 1'b1; end
-					// TODO: LSHI/ASHUI. Their 5-bit signed amount is IR[4:0], but the ALU
-					// sign-extends from IR[7], so negative (right) shifts come out wrong.
+					4'b0000, 4'b0001: begin decoded_config = LSHI;  decoded_Sext_imm = 1'b1; end
+					4'b0010, 4'b0011: begin decoded_config = ASHUI; decoded_Sext_imm = 1'b1; end
 					default: decoded_reg_write = 1'b0;
 				endcase
 			end
