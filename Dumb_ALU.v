@@ -62,7 +62,7 @@
 	
 
 */
-module ALU #(parameter WIDTH = 16) (
+module Dumb_ALU #(parameter WIDTH = 16) (
 	input [4:0] alu_config,
 	input [WIDTH-1:0] lhs, regfile_rhs,
 	input [7:0] immediate_bits,
